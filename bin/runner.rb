@@ -2,21 +2,17 @@
 # typed: true
 # frozen_string_literal: true
 
-# This script executes a full update run for a given repo (optionally for a
+# This script executes a full update run for a local repository (optionally for a
 # specific dependency only), and shows the proposed changes to any dependency
 # files without actually creating a pull request.
 #
-# It's used regularly by the Dependabot team to manually debug issues, so
-# should always be up-to-date.
+# This is a modified version that works with local repositories.
 #
 # Usage:
-#   ruby bin/dry-run.rb [OPTIONS] PACKAGE_MANAGER GITHUB_REPO
-#
-# ! You'll need to have a GitHub access token (a personal access token is
-# ! fine) available as the environment variable LOCAL_GITHUB_ACCESS_TOKEN.
+#   ruby bin/runner.rb [OPTIONS] PACKAGE_MANAGER LOCAL_REPO_PATH
 #
 # Example:
-#   ruby bin/dry-run.rb go_modules zonedb/zonedb
+#   ruby bin/runner.rb go_modules /path/to/local/repo
 #
 # Package managers:
 # - bazel
@@ -49,14 +45,6 @@
 # rubocop:disable Style/GlobalVars
 
 require "etc"
-unless Etc.getpwuid(Process.uid).name == "dependabot" || ENV["ALLOW_DRY_RUN_STANDALONE"] == "true"
-  puts <<~INFO
-    bin/dry-run.rb is only supported in a development container.
-
-    Please use bin/docker-dev-shell first.
-  INFO
-  exit 1
-end
 
 $LOAD_PATH << "./bazel/lib"
 $LOAD_PATH << "./bun/lib"
@@ -168,29 +156,31 @@ $options = {
   cooldown: nil
 }
 
-unless ENV["LOCAL_GITHUB_ACCESS_TOKEN"].to_s.strip.empty?
-  $options[:credentials] << Dependabot::Credential.new(
-    {
-      "type" => "git_source",
-      "host" => "github.com",
-      "username" => "x-access-token",
-      "password" => ENV.fetch("LOCAL_GITHUB_ACCESS_TOKEN", nil)
-    }
-  )
-end
+# Commenting the following out as this runner script will attempt
+# to run dependabot on a local path
+# unless ENV["LOCAL_GITHUB_ACCESS_TOKEN"].to_s.strip.empty?
+#   $options[:credentials] << Dependabot::Credential.new(
+#     {
+#       "type" => "git_source",
+#       "host" => "github.com",
+#       "username" => "x-access-token",
+#       "password" => ENV.fetch("LOCAL_GITHUB_ACCESS_TOKEN", nil)
+#     }
+#   )
+# end
 
-unless ENV["LOCAL_AZURE_ACCESS_TOKEN"].to_s.strip.empty?
-  raise "LOCAL_AZURE_ACCESS_TOKEN supplied without LOCAL_AZURE_FEED_URL" unless ENV["LOCAL_AZURE_FEED_URL"]
+# unless ENV["LOCAL_AZURE_ACCESS_TOKEN"].to_s.strip.empty?
+#   raise "LOCAL_AZURE_ACCESS_TOKEN supplied without LOCAL_AZURE_FEED_URL" unless ENV["LOCAL_AZURE_FEED_URL"]
 
-  $options[:credentials] << Dependabot::Credential.new(
-    {
-      "type" => "nuget_feed",
-      "host" => "pkgs.dev.azure.com",
-      "url" => ENV.fetch("LOCAL_AZURE_FEED_URL", nil),
-      "token" => ":#{ENV.fetch('LOCAL_AZURE_ACCESS_TOKEN', nil)}"
-    }
-  )
-end
+#   $options[:credentials] << Dependabot::Credential.new(
+#     {
+#       "type" => "nuget_feed",
+#       "host" => "pkgs.dev.azure.com",
+#       "url" => ENV.fetch("LOCAL_AZURE_FEED_URL", nil),
+#       "token" => ":#{ENV.fetch('LOCAL_AZURE_ACCESS_TOKEN', nil)}"
+#     }
+#   )
+# end
 
 unless ENV["LOCAL_CONFIG_VARIABLES"].to_s.strip.empty?
   # For example:
@@ -224,7 +214,7 @@ end
 
 # rubocop:disable Metrics/BlockLength
 option_parse = OptionParser.new do |opts|
-  opts.banner = "usage: ruby bin/dry-run.rb [OPTIONS] PACKAGE_MANAGER REPO"
+  opts.banner = "usage: ruby bin/runner.rb [OPTIONS] PACKAGE_MANAGER LOCAL_REPO_PATH"
 
   opts.on("--provider PROVIDER", "SCM provider e.g. github, azure, bitbucket") do |value|
     $options[:provider] = value
@@ -387,17 +377,26 @@ unless valid_package_managers.include?(ARGV[0])
   exit 1
 end
 
-# Validate repo format
-unless ARGV[1].include?("/")
-  puts "Invalid repo format. Expected format: owner/repo"
+# Get package manager and local repo path
+$package_manager = ARGV[0]
+$local_repo_path = File.expand_path(ARGV[1])
+
+# Validate that the local repo path exists
+unless Dir.exist?($local_repo_path)
+  puts "Error: Local repository path does not exist: #{$local_repo_path}"
   exit 1
 end
 
-$package_manager, $repo_name = ARGV
+# Derive a repo name from the path (use directory name for cache naming)
+path_parts = $local_repo_path.split("/").reject(&:empty?)
+repo_dir_name = path_parts[-1]
+$repo_name = "local/#{repo_dir_name}"
+
+puts "=> Running Dependabot on local repository: #{$local_repo_path}"
+puts "=> Using repo identifier: #{$repo_name}"
 
 # Ensure the script does not exit prematurely
 begin
-  $package_manager, $repo_name = ARGV
 
   def show_diff(original_file, updated_file)
     return unless original_file
@@ -524,19 +523,8 @@ begin
 
   def fetch_files(fetcher)
     if $repo_contents_path
-      if $options[:cache_steps].include?("files") && Dir.exist?($repo_contents_path)
-        puts "=> reading cloned repo from #{$repo_contents_path}"
-      else
-        puts "=> cloning into #{$repo_contents_path}"
-        FileUtils.rm_rf($repo_contents_path)
-        fetcher.clone_repo_contents
-      end
-      if $options[:commit]
-        Dir.chdir($repo_contents_path) do
-          puts "=> checking out commit #{$options[:commit]}"
-          Dependabot::SharedHelpers.run_shell_command("git checkout #{$options[:commit]}")
-        end
-      end
+      puts "=> reading local repo from #{$repo_contents_path}"
+      # Fetch files directly from the local repository
       fetcher.files
     else
       cached_dependency_files_read do
@@ -601,7 +589,8 @@ begin
     commit: $options[:commit]
   )
 
-  $repo_contents_path = File.expand_path(File.join("tmp", $repo_name.split("/")))
+  # Use the local repository path directly instead of cloning
+  $repo_contents_path = $local_repo_path
 
   # Initial fetcher_args for config file fetching (without update_config)
   initial_fetcher_args = {
