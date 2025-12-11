@@ -254,32 +254,6 @@ $options = {
   cooldown: nil
 }
 
-# Commenting the following out as this runner script will attempt
-# to run dependabot on a local path
-# unless ENV["LOCAL_GITHUB_ACCESS_TOKEN"].to_s.strip.empty?
-#   $options[:credentials] << Dependabot::Credential.new(
-#     {
-#       "type" => "git_source",
-#       "host" => "github.com",
-#       "username" => "x-access-token",
-#       "password" => ENV.fetch("LOCAL_GITHUB_ACCESS_TOKEN", nil)
-#     }
-#   )
-# end
-
-# unless ENV["LOCAL_AZURE_ACCESS_TOKEN"].to_s.strip.empty?
-#   raise "LOCAL_AZURE_ACCESS_TOKEN supplied without LOCAL_AZURE_FEED_URL" unless ENV["LOCAL_AZURE_FEED_URL"]
-
-#   $options[:credentials] << Dependabot::Credential.new(
-#     {
-#       "type" => "nuget_feed",
-#       "host" => "pkgs.dev.azure.com",
-#       "url" => ENV.fetch("LOCAL_AZURE_FEED_URL", nil),
-#       "token" => ":#{ENV.fetch('LOCAL_AZURE_ACCESS_TOKEN', nil)}"
-#     }
-#   )
-# end
-
 unless ENV["LOCAL_CONFIG_VARIABLES"].to_s.strip.empty?
   # For example:
   # "[{\"type\":\"npm_registry\",\"registry\":\
@@ -333,14 +307,6 @@ option_parse = OptionParser.new do |opts|
   ) do |value|
     $options[:dependency_names] = value.split(",").map { |o| o.strip.downcase }
   end
-
-  # opts.on("--cache STEPS", "Cache e.g. files, dependencies") do |value|
-  #   $options[:cache_steps].concat(value.split(",").map(&:strip))
-  # end
-
-  # opts.on("--write", "Write the update to the cache directory") do |_value|
-  #   $options[:write] = true
-  # end
 
   opts.on("--reject-external-code", "Reject external code") do |_value|
     $options[:reject_external_code] = true
