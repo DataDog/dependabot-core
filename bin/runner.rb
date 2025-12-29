@@ -11,18 +11,7 @@
 # package.json, Gemfile, etc.) without creating a pull request.
 #
 # ────────────────────────────────────────────────────────────────────────────
-# Key Difference from bin/dry-run.rb:
-# ────────────────────────────────────────────────────────────────────────────
-#
-# bin/dry-run.rb:
-#   - Works with REMOTE GitHub repositories (requires GitHub access token)
-#   - Fetches files from GitHub API
-#   - Must run inside a dev container (bin/docker-dev-shell)
-#   - Does NOT modify local files
-#   - Usage: ruby bin/dry-run.rb PACKAGE_MANAGER GITHUB_REPO
-#   - Example: ruby bin/dry-run.rb go_modules octocat/Hello-World
-#
-# bin/runner.rb (this script):
+# /runner.rb:
 #   - Works with LOCAL filesystem repositories (no GitHub token needed)
 #   - Reads files directly from your local path
 #   - Runs standalone on your machine (no container required)
@@ -108,35 +97,11 @@
 # ────────────────────────────────────────────────────────────────────────────
 # Supported Package Managers:
 # ────────────────────────────────────────────────────────────────────────────
-#
-# Package managers:
-# - bazel
-# - bun
-# - bundler
-# - cargo
-# - composer
-# - conda
-# - devcontainers
-# - docker
-# - docker_compose
-# - dotnet_sdk
-# - elm
-# - go_modules
-# - gradle
-# - helm
-# - hex
-# - maven
-# - npm_and_yarn
-# - nuget
-# - pip (includes pipenv)
-# - pub
-# - rust_toolchain
-# - submodules
-# - swift
-# - terraform
-# - opentofu
-# - vcpkg
-
+# Internal image is set up to work with the following package managers:
+# - bundler *
+# - cargo *)
+# - go_modules *
+# - gradle *
 # rubocop:disable Style/GlobalVars
 
 require "etc"
@@ -227,6 +192,21 @@ require "dependabot/terraform"
 require "dependabot/opentofu"
 require "dependabot/uv"
 require "dependabot/vcpkg"
+
+# Patch FileFetchers to skip cloning when repo_contents_path is provided
+module Dependabot
+  module FileFetchers
+    class Base
+      def clone_repo_contents
+        # If repo_contents_path is provided, use it directly without cloning
+        return repo_contents_path if repo_contents_path && Dir.exist?(repo_contents_path)
+
+        # Otherwise, use the original logic
+        @clone_repo_contents ||= _clone_repo_contents(target_directory: repo_contents_path)
+      end
+    end
+  end
+end
 
 # GitHub credentials with write permission to the repo you want to update
 # (so that you can create a new branch, commit and pull request).
