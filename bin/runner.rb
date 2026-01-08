@@ -11,18 +11,7 @@
 # package.json, Gemfile, etc.) without creating a pull request.
 #
 # ────────────────────────────────────────────────────────────────────────────
-# Key Difference from bin/dry-run.rb:
-# ────────────────────────────────────────────────────────────────────────────
-#
-# bin/dry-run.rb:
-#   - Works with REMOTE GitHub repositories (requires GitHub access token)
-#   - Fetches files from GitHub API
-#   - Must run inside a dev container (bin/docker-dev-shell)
-#   - Does NOT modify local files
-#   - Usage: ruby bin/dry-run.rb PACKAGE_MANAGER GITHUB_REPO
-#   - Example: ruby bin/dry-run.rb go_modules octocat/Hello-World
-#
-# bin/runner.rb (this script):
+# /runner.rb:
 #   - Works with LOCAL filesystem repositories (no GitHub token needed)
 #   - Reads files directly from your local path
 #   - Runs standalone on your machine (no container required)
@@ -108,35 +97,11 @@
 # ────────────────────────────────────────────────────────────────────────────
 # Supported Package Managers:
 # ────────────────────────────────────────────────────────────────────────────
-#
-# Package managers:
-# - bazel
-# - bun
-# - bundler
-# - cargo
-# - composer
-# - conda
-# - devcontainers
-# - docker
-# - docker_compose
-# - dotnet_sdk
-# - elm
-# - go_modules
-# - gradle
-# - helm
-# - hex
-# - maven
-# - npm_and_yarn
-# - nuget
-# - pip (includes pipenv)
-# - pub
-# - rust_toolchain
-# - submodules
-# - swift
-# - terraform
-# - opentofu
-# - vcpkg
-
+# Internal image is set up to work with the following package managers:
+# - bundler *
+# - cargo *)
+# - go_modules *
+# - gradle *
 # rubocop:disable Style/GlobalVars
 
 require "etc"
@@ -227,6 +192,34 @@ require "dependabot/terraform"
 require "dependabot/opentofu"
 require "dependabot/uv"
 require "dependabot/vcpkg"
+
+# Patch FileFetchers to skip cloning when repo_contents_path is provided
+module Dependabot
+  module FileFetchers
+    class Base
+      def clone_repo_contents
+        # If repo_contents_path is provided, use it directly without cloning
+        return repo_contents_path if repo_contents_path && Dir.exist?(repo_contents_path)
+
+        # Otherwise, use the original logic
+        @clone_repo_contents ||= _clone_repo_contents(target_directory: repo_contents_path)
+      end
+    end
+  end
+end
+
+# Patch UpdateCheckers to filter advisories by dependency name
+module Dependabot
+  module UpdateCheckers
+    class Base
+      def active_advisories
+        security_advisories
+          .select { |a| a.dependency_name.casecmp(dependency.name)&.zero? }
+          .select { |a| a.vulnerable?(T.must(current_version)) }
+      end
+    end
+  end
+end
 
 # GitHub credentials with write permission to the repo you want to update
 # (so that you can create a new branch, commit and pull request).
@@ -383,6 +376,13 @@ option_parse = OptionParser.new do |opts|
   end
 
   opts.on(
+    "--list-deps",
+    "List all locally discovered dependencies as JSON and exit (no network calls)"
+  ) do
+    $options[:list_deps] = true
+  end
+
+  opts.on(
     "--format FORMAT",
     "Output format for check-only mode: text (default) or json"
   ) do |value|
@@ -421,7 +421,7 @@ option_parse = OptionParser.new do |opts|
 
     $options[:cooldown] = cooldown_options
   rescue JSON::ParserError
-    puts "Invalid JSON format for cooldown parameter. Please provide a valid JSON string."
+    log_progress("Invalid JSON format for cooldown parameter. Please provide a valid JSON string.")
     exit 1
   end
 end
@@ -437,7 +437,7 @@ end
 
 # Ensure valid arguments are provided
 if ARGV.length < 2
-  puts option_parse.help
+  log_progress(option_parse.help)
   exit 1
 end
 
@@ -480,7 +480,7 @@ $package_managers = ARGV[0].split(",").map(&:strip)
 # Validate each package manager
 $package_managers.each do |pm|
   unless valid_package_managers.include?(pm)
-    puts "Invalid package manager: #{pm}"
+    log_progress("Invalid package manager: #{pm}")
     exit 1
   end
 end
@@ -490,7 +490,7 @@ $local_repo_path = File.expand_path(ARGV[1])
 
 # Validate that the local repo path exists
 unless Dir.exist?($local_repo_path)
-  puts "Error: Local repository path does not exist: #{$local_repo_path}"
+  log_progress("Error: Local repository path does not exist: #{$local_repo_path}")
   exit 1
 end
 
@@ -521,14 +521,14 @@ begin
     # Fetch files directly from the local repository
     fetcher.files
   rescue Dependabot::RepoNotFound => e
-    puts " => handled error whilst fetching dependencies: RepoNotFound #{e.message}"
+    log_progress(" => handled error whilst fetching dependencies: RepoNotFound #{e.message}")
     exit 1 # Exit with a non-zero status for repo not found errors
   rescue StandardError => e
     error_details = Dependabot.fetcher_error_details(e)
     raise unless error_details
 
-    puts " => handled error whilst fetching dependencies: #{error_details.fetch(:"error-type")} " \
-         "#{error_details.fetch(:"error-detail")}"
+    log_progress(" => handled error whilst fetching dependencies: #{error_details.fetch(:"error-type")} " \
+         "#{error_details.fetch(:"error-detail")}")
 
     []
   end
@@ -539,8 +539,8 @@ begin
     error_details = Dependabot.parser_error_details(e)
     raise unless error_details
 
-    puts " => handled error whilst parsing dependencies: #{error_details.fetch(:"error-type")} " \
-         "#{error_details.fetch(:"error-detail")}"
+    log_progress(" => handled error whilst parsing dependencies: #{error_details.fetch(:"error-type")} " \
+         "#{error_details.fetch(:"error-detail")}")
 
     []
   end
@@ -548,11 +548,11 @@ begin
   def log_conflicting_dependencies(conflicting_dependencies)
     return unless conflicting_dependencies.any?
 
-    puts " => The update is not possible because of the following conflicting " \
-         "dependencies:"
+    log_progress(" => The update is not possible because of the following conflicting " \
+         "dependencies:")
 
     conflicting_dependencies.each do |conflicting_dep|
-      puts "   #{conflicting_dep['explanation']}"
+      log_progress("   #{conflicting_dep['explanation']}")
     end
   end
 
@@ -565,8 +565,8 @@ begin
 
     payload = args.last
     if name == "excon.request" || name == "excon.response"
-      puts "🌍 #{name == 'excon.response' ? "<-- #{payload[:status]}" : "--> #{payload[:method].upcase}"}" \
-           " #{Excon::Utils.request_uri(payload)}"
+      log_progress("🌍 #{name == 'excon.response' ? "<-- #{payload[:status]}" : "--> #{payload[:method].upcase}"}" \
+                 " #{Excon::Utils.request_uri(payload)}")
     end
   end
 
@@ -623,7 +623,7 @@ begin
         end
       end
     rescue StandardError => e
-      puts "Warning: Could not parse groups from dependabot.yml: #{e.message}"
+      log_progress("Warning: Could not parse groups from dependabot.yml: #{e.message}")
     end
   end
 
@@ -674,7 +674,7 @@ begin
       )
       config
     rescue KeyError
-      puts "⚠️  Skipping #{$package_manager}: Invalid package manager"
+      log_progress("⚠️  Skipping #{$package_manager}: Invalid package manager")
       next
     end
 
@@ -683,7 +683,7 @@ begin
   fetcher = Dependabot::FileFetchers.for_package_manager($package_manager).new(**fetcher_args)
   $files = fetch_files(fetcher)
   if $files.empty?
-    puts "⚠️  No dependency files found for #{$package_manager}, skipping"
+    log_progress("⚠️  No dependency files found for #{$package_manager}, skipping")
     next
   end
 
@@ -708,6 +708,12 @@ begin
     dependencies.select! do |d|
       $options[:dependency_names].include?(d.name.downcase)
     end
+  end
+
+  # If --list-deps flag is set, output dependencies as comma-separated list and exit
+  if $options[:list_deps]
+    puts dependencies.map(&:name).join(',')
+    exit 0
   end
 
   def update_checker_for(dependency)
@@ -909,17 +915,6 @@ begin
       d.version == d.previous_version
     end
 
-    msg = Dependabot::PullRequestCreator::MessageBuilder.new(
-      dependencies: updated_deps,
-      files: updated_files,
-      credentials: $options[:credentials],
-      source: $source,
-      commit_message_options: $update_config.commit_message_options.to_h,
-      github_redirection_service: Dependabot::PullRequestCreator::DEFAULT_GITHUB_REDIRECTION_SERVICE
-    ).message
-
-    log_progress(" => #{msg.pr_name.downcase}")
-
     # Track outdated dependency for --check-only mode
     if $options[:check_only]
       # Determine update type (major, minor, patch) for grouping
@@ -948,8 +943,20 @@ begin
         dependency: dep,  # Store full dependency object for grouping
         update_type: update_type  # Store update type for update-types filtering
       }
+      log_progress(" => update available: #{dep.name} #{dep.version} -> #{latest_allowed_version}")
       log_progress("    (skipping file write in check-only mode)")
     else
+      # Only create MessageBuilder when actually writing updates or generating PR info
+      msg = Dependabot::PullRequestCreator::MessageBuilder.new(
+        dependencies: updated_deps,
+        files: updated_files,
+        credentials: $options[:credentials],
+        source: $source,
+        commit_message_options: $update_config.commit_message_options.to_h,
+        github_redirection_service: Dependabot::PullRequestCreator::DEFAULT_GITHUB_REDIRECTION_SERVICE
+      ).message
+
+      log_progress(" => #{msg.pr_name.downcase}")
       # Write updated files to the local repository
       updated_files.each do |updated_file|
         file_path = File.join($local_repo_path, $options[:directory], updated_file.name)
@@ -975,8 +982,8 @@ begin
     error_details = Dependabot.updater_error_details(e)
     raise unless error_details
 
-    puts " => handled error whilst updating #{dep.name}: #{error_details.fetch(:"error-type")} " \
-         "#{error_details.fetch(:"error-detail")}"
+    log_progress(" => handled error whilst updating #{dep.name}: #{error_details.fetch(:"error-type")} " \
+         "#{error_details.fetch(:"error-detail")}")
   end
   end # End of package_managers.each loop
 
@@ -1079,38 +1086,38 @@ begin
       puts JSON.pretty_generate(output)
     else
       # Text output (default)
-      puts "\n" + "=" * 80
+      log_progress("\n" + "=" * 80)
       if $outdated_dependencies&.any?
-        puts "📋 Check-only mode summary:"
-        puts "   Found #{$outdated_dependencies.count} outdated dependencies"
-        puts "=" * 80
+        log_progress("📋 Check-only mode summary:")
+        log_progress("   Found #{$outdated_dependencies.count} outdated dependencies")
+        log_progress("=" * 80)
 
         if $dependency_group_objects.any?
           # Display groups
           grouped_deps.each do |group_name, deps|
-            puts "\n📦 Group: #{group_name} (#{deps.count} dependencies)"
+            log_progress("\n📦 Group: #{group_name} (#{deps.count} dependencies)")
             deps.each do |dep|
-              puts "  #{dep[:name]}"
+              log_progress("  #{dep[:name]}")
             end
           end
 
           # Display ungrouped dependencies
           if ungrouped_deps.any?
-            puts "\n📋 Ungrouped dependencies (#{ungrouped_deps.count})"
+            log_progress("\n📋 Ungrouped dependencies (#{ungrouped_deps.count})")
             ungrouped_deps.each do |dep|
-              puts "  #{dep[:name]}"
+              log_progress("  #{dep[:name]}")
             end
           end
         else
           # No groups defined, just list all dependencies
-          puts "\nOutdated dependencies:"
+          log_progress("\nOutdated dependencies:")
           $outdated_dependencies.each do |dep|
-            puts "  #{dep[:name]}"
+            log_progress("  #{dep[:name]}")
           end
         end
       else
-        puts "✅ All dependencies are up-to-date!"
-        puts "=" * 80
+        log_progress("✅ All dependencies are up-to-date!")
+        log_progress("=" * 80)
       end
     end
   end
@@ -1119,7 +1126,7 @@ begin
 
   # rubocop:enable Style/GlobalVars
 rescue StandardError => e
-  puts "An error occurred: #{e.class}, #{e.message}"
+  log_progress("An error occurred: #{e.class}, #{e.message}")
   exit 1
 end
 
