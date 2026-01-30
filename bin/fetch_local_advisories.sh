@@ -40,7 +40,7 @@ esac
 
 # Get list of dependencies from the repo
 echo "Fetching dependencies from $REPO_PATH using $PACKAGE_MANAGER..." >&2
-DEPS=$(cd ~/dd/dependabot-core && SECURITY_ADVISORIES='[]' ruby bin/runner.rb "$PACKAGE_MANAGER" "$REPO_PATH" --dir / --list-deps 2>/dev/null)
+DEPS=$(ruby $DEPENDABOT_HOME/bin/runner.rb "$PACKAGE_MANAGER" "$REPO_PATH" --list-deps 2>/dev/null)
 
 if [ -z "$DEPS" ]; then
     echo "No dependencies found" >&2
@@ -54,7 +54,7 @@ echo "Fetching advisories from GitHub..." >&2
 echo "["
 first=true
 for dep in $(echo $DEPS | tr ',' ' '); do
-    advisories=$(gh api graphql -f query="
+    advisories=$(NO_COLOR=1 gh api graphql -f query="
     query {
       securityVulnerabilities(first: 10, ecosystem: $ECOSYSTEM, package: \"$dep\") {
         nodes {
