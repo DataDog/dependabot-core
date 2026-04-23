@@ -4,6 +4,6 @@
   "description": "xxx",
   "dependencies": {
     "gsap": "npm:@gsap/business@^3.12.4",
-    "next": "^13.2.4"
+    "next": "^16.2.4"
   }
 }
