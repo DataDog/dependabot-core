@@ -3,7 +3,7 @@ module github.com/dependabot/vgotest
 go 1.17
 
 require (
-	github.com/dependabot-fixtures/go-modules-lib v1.0.0
+	github.com/dependabot-fixtures/go-modules-lib v1.0.6
 	rsc.io/quote v1.5.0
 )
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-	_ "github.com/fatih/Color"
+	_ "github.com/fatih/color"
 	_ "github.com/hmarr/404"
 	_ "github.com/mattn/go-colorable"
 	_ "github.com/mattn/go-isatty"
