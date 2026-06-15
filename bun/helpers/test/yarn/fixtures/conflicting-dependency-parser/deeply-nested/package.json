@@ -10,5 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "apass": "1.1.0"
+  },
+  "resolutions": {
+    "async": "^2.6.4"
   }
 }
