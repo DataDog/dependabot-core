@@ -25,5 +25,75 @@
     "eslint-config-prettier": "^10.1.8",
     "jest": "^30.0.5",
     "prettier": "^3.6.2"
+  },
+  "overrides": {
+    "@npmcli/arborist": {
+      "tar": "^7.5.16"
+    },
+    "@dependabot/yarn-lib": {
+      "form-data": "^2.5.6",
+      "lodash": "^4.18.1",
+      "semver": "^5.7.2",
+      "brace-expansion": "^1.1.15"
+    },
+    "npm": {
+      "form-data": "^2.5.6",
+      "ansi-regex": "^4.1.1",
+      "semver": "^5.7.2",
+      "brace-expansion": "^1.1.15"
+    },
+    "eslint": {
+      "brace-expansion": "^1.1.15"
+    },
+    "jest": {
+      "picomatch": "^2.3.2",
+      "brace-expansion": "^1.1.15"
+    },
+    "inquirer": {
+      "ansi-regex": "^4.1.1"
+    },
+    "@jest/core": {
+      "braces": "^3.0.3"
+    },
+    "@jest/transform": {
+      "braces": "^3.0.3"
+    },
+    "find-yarn-workspace-root": {
+      "braces": "^3.0.3"
+    },
+    "jest-config": {
+      "braces": "^3.0.3",
+      "glob": "^10.5.0"
+    },
+    "jest-haste-map": {
+      "braces": "^3.0.3"
+    },
+    "jest-message-util": {
+      "braces": "^3.0.3"
+    },
+    "@jest/reporters": {
+      "glob": "^10.5.0"
+    },
+    "@npmcli/map-workspaces": {
+      "glob": "^10.5.0"
+    },
+    "@npmcli/package-json": {
+      "glob": "^10.5.0"
+    },
+    "cacache": {
+      "glob": "^10.5.0"
+    },
+    "jest-runtime": {
+      "glob": "^10.5.0"
+    },
+    "make-fetch-happen": {
+      "glob": "^10.5.0"
+    },
+    "node-gyp": {
+      "glob": "^10.5.0"
+    },
+    "rimraf": {
+      "glob": "^10.5.0"
+    }
   }
 }
