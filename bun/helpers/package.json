@@ -25,5 +25,80 @@
     "eslint-config-prettier": "^9.1.0",
     "jest": "^29.7.0",
     "prettier": "^3.4.2"
+  },
+  "overrides": {
+    "@npmcli/arborist": {
+      "tar": "^7.5.19",
+      "minimatch": "^9.0.9"
+    },
+    "@dependabot/yarn-lib": {
+      "form-data": "^2.5.6",
+      "lodash": "^4.18.1",
+      "semver": "^5.7.2",
+      "js-yaml": "^3.14.2"
+    },
+    "npm": {
+      "form-data": "^2.5.6",
+      "ansi-regex": "^3.0.1",
+      "semver": "^5.7.2"
+    },
+    "@npmcli/map-workspaces": {
+      "minimatch": "^9.0.9",
+      "glob": "^10.5.0"
+    },
+    "@npmcli/package-json": {
+      "minimatch": "^9.0.9",
+      "glob": "^10.5.0"
+    },
+    "@tufjs/models": {
+      "minimatch": "^9.0.9"
+    },
+    "cacache": {
+      "minimatch": "^9.0.9",
+      "glob": "^10.5.0"
+    },
+    "ignore-walk": {
+      "minimatch": "^9.0.9"
+    },
+    "make-fetch-happen": {
+      "minimatch": "^9.0.9",
+      "glob": "^10.5.0"
+    },
+    "node-gyp": {
+      "minimatch": "^9.0.9",
+      "glob": "^10.5.0"
+    },
+    "rimraf": {
+      "minimatch": "^9.0.9",
+      "glob": "^10.5.0"
+    },
+    "jest": {
+      "picomatch": "^2.3.2",
+      "js-yaml": "^3.14.2"
+    },
+    "inquirer": {
+      "ansi-regex": "^3.0.1"
+    },
+    "strip-ansi": {
+      "ansi-regex": "^3.0.1"
+    },
+    "@jest/core": {
+      "braces": "^3.0.3"
+    },
+    "@jest/transform": {
+      "braces": "^3.0.3"
+    },
+    "find-yarn-workspace-root": {
+      "braces": "^3.0.3"
+    },
+    "jest-config": {
+      "braces": "^3.0.3"
+    },
+    "jest-haste-map": {
+      "braces": "^3.0.3"
+    },
+    "jest-message-util": {
+      "braces": "^3.0.3"
+    }
   }
 }
