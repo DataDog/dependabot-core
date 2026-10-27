@@ -58,8 +58,8 @@ RSpec.describe Dependabot::Bazel::FileParser do
       it "uses the detected Bazel version" do
         ecosystem = parser.ecosystem
 
-        expect(ecosystem.package_manager.version.to_s).to eq("6.4.0")
-        expect(ecosystem.language.version.to_s).to eq("6.4.0")
+        expect(ecosystem.package_manager.version.to_s).to eq("8.8.2")
+        expect(ecosystem.language.version.to_s).to eq("8.8.2")
       end
     end
 
@@ -67,9 +67,9 @@ RSpec.describe Dependabot::Bazel::FileParser do
       it "uses the default version for detected_version" do
         ecosystem = parser.ecosystem
 
-        expect(ecosystem.package_manager.detected_version.to_s).to eq("8.4.2")
+        expect(ecosystem.package_manager.detected_version.to_s).to eq("8.8.2")
         expect(ecosystem.package_manager.version).to be_nil
-        expect(ecosystem.language.version.to_s).to eq("8.4.2")
+        expect(ecosystem.language.version.to_s).to eq("8.8.2")
       end
     end
   end
@@ -106,7 +106,7 @@ RSpec.describe Dependabot::Bazel::FileParser do
     let(:dependency_files) { bazel_project_dependency_files("with_bazelversion") }
 
     it "detects the Bazel version" do
-      expect(parser.send(:bazel_version)).to eq("6.4.0")
+      expect(parser.send(:bazel_version)).to eq("8.8.2")
     end
   end
 
@@ -245,7 +245,7 @@ RSpec.describe Dependabot::Bazel::FileParser do
       expect(load_deps.map(&:name)).to include("rules_cc")
 
       # Bazel version detection
-      expect(parser.send(:bazel_version)).to eq("6.4.0")
+      expect(parser.send(:bazel_version)).to eq("8.8.2")
     end
   end
 
