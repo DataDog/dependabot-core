@@ -162,7 +162,7 @@ RSpec.describe Dependabot::Bazel::FileUpdater::LockfileUpdater do
       let(:dependency_files) { bazel_project_dependency_files("with_bazelversion") }
 
       it "returns the version from .bazelversion file" do
-        expect(lockfile_updater.determine_bazel_version).to eq("6.4.0")
+        expect(lockfile_updater.determine_bazel_version).to eq("8.8.2")
       end
     end
 
